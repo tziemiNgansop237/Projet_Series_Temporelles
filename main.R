@@ -1,64 +1,301 @@
-###############################################################################
-#                                                                             #
-#                PROJET DE SERIE TEMPORELLES                                  #
-#                                                                             #
-###############################################################################
+# ***************************************************************************
+# ******************** Projet de séries temporelles 2025 ********************
+# ***************************************************************************
 
-## Importation des libraries
+# Auteurs : TZIEMI NGANSOP RAYMOND BRIAND et TANGOUO KUETE IVANA
+
+rm(list=ls(all=TRUE))
+
+#Chargement des packages 
 require(zoo) #format de serie temporelle pratique et facile d'utilisation (mais plus volumineux)
-require(tseries) #diverses fonctions sur les series temporelles
+require(tseries)
 
 library(dplyr)
 library(readxl)
+library(ellipse)
+require(zoo)
 library(ggplot2)
+library(gridExtra)
+library(fUnitRoots)
+library(forecast)
+library(tseries)
+library(lubridate)
+library(urca)
 
-IPI <- read_excel("C:/Users/LENOVO/Desktop/PROJET_serie_temp/IPI_202501.xls")
+# Chargement et nettoyage de la base 
+### Spécification du répertoire de travail
+#setwd(choose.dir())
+#base<-read_excel("IPI_202501.xls")
 
-summary(IPI)
+base <- read_excel("C:/Users/damso/Desktop/p/IPI_202501.xls")
 
-str(IPI)
-
-# Créer une série temporelle (exemple : ventes mensuelles de 2015 à 2024)
-data_ts <- ts(IPI$BE, start = c(1990, 1), frequency = 12)
-
-# Affichage du graphique
-plot(data_ts, main = "Évolution des BE", ylab = "Ventes", xlab = "Années", col = "blue", lwd = 2)
-
-
-
-
-
-# Création de séries temporelles à partir du dataframe IPI
-data_ts1 <- ts(IPI$BE, start = c(1990, 1), frequency = 12)  # Série 1
-data_ts2 <- ts(IPI$CZ, start = c(1990, 1), frequency = 12)  # Série 2
-data_ts3 <- ts(IPI$DE, start = c(1990, 1), frequency = 12)  # Série 3
-data_ts4 <- ts(IPI$FZ, start = c(1990, 1), frequency = 12)  # Série 4
-
-# Tracé de la première série
-plot(data_ts1, type = "l", col = "blue", lwd = 1.5, 
-     ylim = range(c(data_ts1, data_ts2, data_ts3, data_ts4)), 
-     main = "Comparaison de quatre séries temporelles", 
-     xlab = "Années", ylab = "Valeur")
-
-# Ajout des autres séries temporelles
-lines(data_ts2, col = "red", lwd = 1.5)
-lines(data_ts3, col = "yellow", lwd = 1.5)
-lines(data_ts4, col = "black", lwd = 1.5)
-
-# Ajout de la légende
-legend("bottomleft", 
-       legend = c("Indus ", "Indus manu", "Indus Extrac", "Construction"), 
-       col = c("blue", "red", "yellow", "black"), 
-       lwd = 1.5, box.lwd = 0.1, cex=0.4)
+summary(base)
 
 
-### SERIE DES PRODUITS INFORMATIQUES 
+# **************************************************************************#
+#                                                                           #
+#                                                                           #
+#                         PART I : The Data                            #
+#                                                                           #
+#                                                                           #
+# **************************************************************************#
 
-info_ts <- ts(IPI$`[CI]`,start=c(1990,1), frequency= 12)
-agro_ts <- ts(IPI$`(C1)`,start=c(1990,1), frequency= 12)
-plot(info_ts, type = "l", col = "blue", lwd = 1.5, 
-     ylim = range(c(data_ts1, data_ts2, data_ts3, data_ts4)), 
-     xlab = "Années", ylab = "Valeur")
-lines(agro_ts, col = "red", lwd = 1.5)
+# ========================================================================= #
+# ============================= Question 1 ================================ #
+# ========================================================================= #
 
-### DAIFFERENCIATION DE LA SERIE
+
+##### 1-formatage des variables d'interêts
+
+## Selection de nos variable d'interêt: temps et données informatique( CI)
+data <- base[c(1,7)]
+
+## Renommer les colonnes 
+colnames(data)<-c("Periode","indice")
+
+## Formatage de la variable temporelle : "Année- Mois- Jour"
+data$Periode <- substr(data$Periode, 2, nchar(data$Periode))
+data$Periode <-  as.Date(paste0(data$Periode, "01"), format = "%Y%m%d")
+
+
+#####  Définir les données d'entrainement et de test 
+
+#    '''Etant données que ARMA est un modèle à court terme nous allons
+#       Garder 12 observations pour les test '''
+
+#       '''Test : Du 01-01-2024 au 01-01-2025
+#          Entrainement: Avant le 01-01-2024
+#       '''
+
+# Données d'entrainement
+train_data <- data %>%
+  filter(Periode < as.Date("2024-01-01"))
+
+# Données de test
+test_data <- data %>%
+  filter(Periode >= as.Date("2024-01-01"))
+
+
+#    ''' Copie de la train_data '''
+
+train_copie <- train_data
+
+
+
+# ========================================================================= #
+# =============================== Question 2 ============================== #
+# ========================================================================= #
+
+### 2-a) Visualisation des données avant traitement
+
+windows()
+
+ggplot(train_data, aes(x = Periode, y = indice)) +
+  geom_line(color = "black") +  # Couleur de la série
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(x = "", y = "Valeurs de l'indice", title = "") +
+  theme(panel.background = element_rect(fill = "lightgrey"))  # Couleur de fond grise
+
+#### Verification des Autocorrélations simples et partielles de la série brute
+
+windows()
+par(mfrow=c(1,2))
+acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
+
+
+#on suspecte l'existance d'une tendance déterministe : test de stationarité
+
+### 2-b) Test de Ljung-Box ----
+
+#nous commençons par effectuer un test de Ljung-Box pour vérifier 
+#Si les résidus de l’ADF sont autocorrélés, cela biaisera les résultats du test.
+#Sinon On pourrait conclure à tort qu’une série est stationnaire.
+
+#    '''La fonction suivante effectue un test de ***Ljung-Box*** sur une série 
+#     temporelle pour vérifier l'autocorrélation des résidus d'un modèle ajusté 
+#    '''
+
+#   '''H0 (hypothèse nulle) : Il n'y a pas d'autocorrélation dans les résidus. Les 
+#   '''résidus sont indépendants (aucune relation entre eux).
+
+#   '''H1 (hypothèse alternative) : Il existe une autocorrélation dans les 
+#   '''résidus. Les résidus ne sont pas indépendants.
+
+Qtests  <- function(var, k, fitdf=0) {
+  pvals <- apply(matrix(1:k), 1, FUN=function(l) {
+    pval <- if (l<=fitdf) NA else Box.test(var, lag=l, type="Ljung-Box", fitdf=fitdf)$p.value # Le test de Ljung-Box teste l'hypothèse nulle selon laquelle les retards jusqu'à lag inclusivement de l'autocorrélation sont nuls
+    return(c("lag"=l,"pval"=pval))
+  })
+  return(t(pvals))
+}
+
+# Test
+Qtests (train_data$indice, 20,0) 
+#Resultat: Il y'a autocorellatoon entre les données
+
+
+
+##### 2-c) Test de stationnarité de la serie
+
+## a- Test de Dickey Fuller augmenté
+
+#   ''' Nous selectionons tout d'abord automatiquement le nombre de lags optimal 
+#       par le crictère AIC, ensuite nous verifions si les résidus de ce modèle 
+#       sont indépendants , afin de renforcer la robustesse, au cas contraire  
+#       les résidedus montre l'autocorellation et Nous allons réajuster le modèle
+#       et augmenter les lags à k+1'''
+
+
+
+##Première méthode
+
+# Fonction combinée ADF avec vérification des résidus
+adfTest_valid_combined <- function(var, kmax, adftype) {
+  # Sélectionner les lags via BIC
+  adf_test <- ur.df(var, type = adftype, selectlags = "BIC")  # Sélection des lags selon AIC
+  k <- adf_test@lags  # Nombre de lags sélectionné par AIC
+  print(paste("Number of lags selected by BIC: ", k))
+  adf_test_aic <- ur.df(var, type = adftype, selectlags = "BIC")
+  print(paste("Number of lags selected by AIC: ", adf_test_aic@lags))
+  
+  # Extraire les résidus du modèle ADF
+  residuals_adf <- adf_test@res
+  
+  # Tester les résidus du modèle ajusté pour l'autocorrélation
+  pvals <- Qtests(residuals_adf, 20, fitdf = length(adf_test@teststat))[, 2]
+  
+  if (sum(pvals < 0.05, na.rm = TRUE) == 0) {
+    # Si les résidus sont indépendants (pas d'autocorrélation)
+    print("Residuals are independent (no autocorrelation detected).")
+  } else {
+    # Si les résidus montrent encore de l'autocorrélation, ajuster le modèle
+    print("Residuals show autocorrelation, adjusting the model...")
+    
+    # Augmenter les lags et réajuster le modèle 
+    
+    pvals_new <- pvals
+    while (sum(pvals_new < 0.05, na.rm = TRUE) == 0){
+      k <- k + 1
+      print(paste("Trying with ", k, " lags."))
+      
+      adf_test_new <- ur.df(var, type = adftype, lags = k)
+      residuals_adf_new <- adf_test_new@res
+      
+      # Vérifier les résidus du modèle ajusté
+      pvals_new <- Qtests(residuals_adf_new, 20, fitdf = length(adf_test_new@teststat))[, 2]
+      
+      if (sum(pvals_new < 0.05, na.rm = TRUE) == 0) {
+        print("Adjusted model: Residuals are now independent.")
+      }else {
+        print("Residuals still show autocorrelation even after adjustment.")
+        adf_test <- adf_test_new
+      }
+    }
+  }
+  
+  return(adf_test)  # Retourner le test ADF final
+}
+
+# Exemple d'application sur une série de données
+adfTest_valid_combined(train_data$indice, kmax = 20, adftype = "drift")
+
+### Deuxieme methode
+
+##### function qui cherche le lag idéal pour la régression de Dickey Fuller
+adfTest_valid <- function(var, kmax, adftype){
+  k <- 0
+  noautocorr <- 0 # est-ce que les résidus sont un BB faible ?
+  while (noautocorr==0){
+    cat(paste0("ADF with ",k," lags: residuals OK? "))
+    test_adf <- adfTest(var, lags=k, type=adftype)
+    pvals <- Qtests(test_adf@test$lm$residuals, 20, fitdf = length(test_adf@test$lm$coefficients))[,2] # On fait le test de potmanteau
+    if (sum(pvals<0.05,na.rm=T)==0) { # si aucune p_value n'entre dans la zone de rejet
+      noautocorr <- 1; cat("OK \n")
+    } else cat("nope \n")
+    
+    
+    k <- k+1
+  }
+  return(test_adf)
+}
+
+
+## Application de la fonction pour trouver le lag efficace pour le test ADF
+best_adf <- adfTest_valid(var=train_data$indice,kmax=24,adftype="ct") # ADF with 4 lags: residuals OK? OK
+
+best_adf
+
+
+
+  ### 2-d) Elimination de la stationnarité
+
+# Nous allons différencier la série initiale avec un lag de 1 et nommer sa transformé dindice
+
+train_data["dindice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ordre 1
+train_copie["dindice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ordre 1
+
+
+
+## Représentation des autocorrélations simples des séries indice et dindice(serie différenciée)
+
+windows()
+par(mfrow=c(1,2))
+acf(train_data$indice,lag.max=24,main="",xaxt = "n")
+axis(1, at = 0:24, labels = FALSE)
+text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, adj = 1, xpd = TRUE)
+acf(train_data$dindice[-1],lag.max=24,main="",xaxt = "n")
+axis(1, at = 0:24, labels = FALSE)
+text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, adj = 1, xpd = TRUE)
+
+
+## 2-e) Test de stationnarité de la série dindice
+
+best_dadf <- adfTest_valid(var=train_data$dindice,kmax=24,adftype="ct") # ADF with 3 lags: residuals OK? OK
+
+best_dadf
+
+### Nous constatons que la série différencié est stationnaire
+
+
+## Utilisation des autres tests pour conforter les résultats
+# KPSS test:
+kpss.test(train_data$dindice[-1]) # stationarité
+#
+pp.test(train_data$dindice[-1])# stationnarité
+
+
+# ========================================================================= #
+# =============================== Question 3 ============================== #
+# ========================================================================= #
+
+###  Représenter graphiquement la série choisie avant et après transformation.----
+
+windows()
+# Création des deux graphiques
+serie_brute <- ggplot(data = train_copie[-1,], aes(x = Periode, y = indice)) +
+  geom_line() +
+  labs(x = "", y = "Indice", title = "")+
+  theme(panel.background = element_rect(fill = "lightgrey"))
+
+serie_diff <- ggplot(data = train_copie[-1,], aes(x = Periode, y = dindice)) +
+  geom_line() +
+  labs(x = "", y = "Indice différencié", title = "")+
+  theme(panel.background = element_rect(fill = "lightgrey"))
+
+# Affichage des deux graphiques côte à côte
+grid.arrange(serie_brute, serie_diff, nrow = 1)
+
+
+# **************************************************************************#
+#                                                                           #
+#                                                                           #
+#                         PARTIE II : Mod?les ARMA                          #
+#                                                                           #
+#                                                                           #
+# **************************************************************************#
+
+# ========================================================================= #
+# =============================== Question 4 ============================== #
+# ========================================================================= #
+
+###Choix du modèle ARMA(p,q) et vérification de la validité

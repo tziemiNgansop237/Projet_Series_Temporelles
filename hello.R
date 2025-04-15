@@ -82,8 +82,11 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 
 #on suspecte l'existance d'une tendance déterministe : test de stationarité
 
-### test de stationnarité ----
-### ADF test
+### 2-A) Test de Ljung-Box ----
+
+#nous commençons par effectuer un test de Ljung-Box pour vérifier 
+#Si les résidus de l’ADF sont autocorrélés, cela biaisera les résultats du test.
+# Sinon On pourrait conclure à tort qu’une série est stationnaire.
 
 #    '''La fonction suivante effectue un test de ***Ljung-Box*** sur une série 
 #     temporelle pour vérifier l'autocorrélation des résidus d'un modèle ajusté 
@@ -105,11 +108,11 @@ Qtests  <- function(var, k, fitdf=0) {
 
 # Test
 Qtests (train_data$indice, 20,0) 
-#Resultat: Autocorellatoon entre les données
+#Resultat: Il y'a autocorellatoon entre les données
 
 
 
-##### 2- Test de stationnarité de la serie
+##### 2-B) Test de stationnarité de la serie
    
    ## a- Test de Dickey Fuller augmenté
 
