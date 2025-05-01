@@ -22,6 +22,7 @@ library(forecast)
 library(tseries)
 library(lubridate)
 library(urca)
+library(lubridate)
 
 
 ###### I- Importation du dataset  
@@ -435,8 +436,63 @@ print(roots)
 
 #**************************(voir document)*************************************#
 
+# Convertir la série en data frame pour ggplot
+data_frame <- data.frame(valeurs = as.numeric(arima112$residuals))
 
 
+#8. Représenter graphiquement cette région pour α = 95%. Commenter.
+
+# ---- PRÉDICTION SUR 5 MOIS ----
+# Prédiction avec intervalles de confiance
+pred <- forecast(arima112, h = 5, level = 95)
+
+# Affichage des valeurs prédites et intervalles
+print(pred)
+
+# ---- EXTRACTION DES DONNÉES TEST ----
+# Assure-toi que test_data$d_indice contient au moins 5 valeurs
+test_vals <- test_data$indice[1:5]
+
+# ---- TRAÇONS LE GRAPHE ----
+
+
+# Séries complètes à tracer
+valeurs_observées <- c(train_data$indice, rep(NA, 5))
+valeurs_test <- c(rep(NA, length(train_data$indice)), test_vals)
+valeurs_prédites <- c(rep(NA, length(train_data$indice)), as.numeric(pred$mean))
+IC_up <- c(rep(NA, length(train_data$indice)), pred$upper)
+IC_low <- c(rep(NA, length(train_data$indice)), pred$lower)
+
+# Créer une séquence de dates mensuelles
+date_index <- seq(as.Date("1990-01-01"), by = "month", length.out = length(train_data$d_indice) + 5)
+
+# Construire le data.frame pour le graphique
+df_plot <- data.frame(
+  Date =date_index ,
+  Train = c(train_data$indice, rep(NA, 5)),
+  Test = c(rep(NA, length(train_data$indice)), head(test_data$indice, 5)),
+  Prévisions = c(rep(NA, length(train_data$indice)), as.numeric(pred$mean)),
+  IC_low = c(rep(NA, length(train_data$indice)), as.numeric(pred$lower)),
+  IC_up = c(rep(NA, length(train_data$indice)), as.numeric(pred$upper))
+)
+
+
+
+# Tracer le graphique
+ggplot(df_plot, aes(x = Date)) +
+  geom_line(aes(y = Train, color = "Train")) +
+  geom_line(aes(y = Test, color = "Test")) +
+  geom_line(aes(y = Prévisions, color = "Prévisions")) +
+  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "pink", alpha = 0.3) +
+  annotate("rect",
+           xmin = df_plot$Date[length(train_data$indice) + 1],
+           xmax = max(df_plot$Date),
+           ymin = -Inf, ymax = Inf,
+           fill = "lightgrey", alpha = 0.3) +
+  scale_color_manual(values = c("Train" = "cyan", "Test" = "blue", "Prévisions" = "deeppink")) +
+  labs(title = "Prévisions ARIMA vs Données réelles",
+       x = "Date", y = "Indice", color = "Légende") +
+  theme_minimal()
 
 
 
