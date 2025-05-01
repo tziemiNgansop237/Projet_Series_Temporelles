@@ -1,13 +1,19 @@
-# ***************************************************************************
-# ******************** Projet de séries temporelles 2025 ********************
-# ***************************************************************************
 
-# Auteurs : TZIEMI NGANSOP RAYMOND BRIAND et TANGOUO KUETE IVANA
+###############################################################################
+#                         Projet : Séries Temporelles (2025)                 #
+#                         Auteurs : TZIEMI NGANSOP & TANGOUO KUETE IVANA     #
+#                         Date   : 12/05/2025                                #
+#                         Objet  : Analyse et modélisation ARIMA             #
+###############################################################################
 
-rm(list=ls(all=TRUE))
 
-#Chargement des packages 
-require(zoo) #format de serie temporelle pratique et facile d'utilisation (mais plus volumineux)
+
+
+#==============================================================================
+#                             Chargement des packages                   
+#==============================================================================
+
+require(zoo) #format de serie temporelle pratique et facile d'utilisation
 require(tseries)
 
 library(dplyr)
@@ -24,10 +30,8 @@ library(urca)
 
 # Chargement et nettoyage de la base 
 ### Spécification du répertoire de travail
-#setwd(choose.dir())
-#base<-read_excel("IPI_202501.xls")
-
-base <- read_excel("C:/Users/damso/Desktop/p/IPI_202501.xls")
+chemin <- "C:/Users/damso/Desktop/p/IPI_202501.xls"
+base <- read_excel(chemin)
 
 summary(base)
 
@@ -35,7 +39,7 @@ summary(base)
 # **************************************************************************#
 #                                                                           #
 #                                                                           #
-#                         PART I : The Data                            #
+#                         PART I : The Data                                 #
 #                                                                           #
 #                                                                           #
 # **************************************************************************#
@@ -48,7 +52,7 @@ summary(base)
 ##### 1-formatage des variables d'interêts
 
 ## Selection de nos variable d'interêt: temps et données informatique( CI)
-data <- base[c(1,7)]
+data <- base %>% select(c(`NAF rev. 2`,`CZ`))
 
 ## Renommer les colonnes 
 colnames(data)<-c("Periode","indice")
@@ -58,14 +62,14 @@ data$Periode <- substr(data$Periode, 2, nchar(data$Periode))
 data$Periode <-  as.Date(paste0(data$Periode, "01"), format = "%Y%m%d")
 
 
-#####  Définir les données d'entrainement et de test 
+#####  Définition des données d'entrainement et de test 
 
-#    '''Etant données que ARMA est un modèle à court terme nous allons
-#       Garder 12 observations pour les test '''
+## Etant données que ARMA est un modèle à court terme  
+## nous allons Garder 12 observations pour les test #
 
-#       '''Test : Du 01-01-2024 au 01-01-2025
-#          Entrainement: Avant le 01-01-2024
-#       '''
+#     '''Test : Données Du 01-01-2024 au 01-01-2025'''
+##     '''Entrainement: Données Avant le 01-01-2024'''
+
 
 # Données d'entrainement
 train_data <- data %>%
@@ -86,6 +90,21 @@ train_copie <- train_data
 # =============================== Question 2 ============================== #
 # ========================================================================= #
 
+
+### 2-a)Vérification de la saisonnalité de la série temporelle
+
+## Puisque c'est une série mensuelle, nous allons vérifier la saisonnalité 
+## sur 12 mois(1 an) en utilisant le test de QS(Q-statistic test)
+
+ts_data <- ts(data$indice, frequency = 12)  
+isSeasonal(ts_data, test = "qs")  # "qs" = test basé sur la variance intra-période
+
+###########################################################
+# Ce test nous indique que la série n'est pas saisonnière,
+# nous allons donc nous concentrer sur la stationnarité .
+#_____________________________#___________________________#
+
+
 ### 2-a) Visualisation des données avant traitement
 
 windows()
@@ -103,39 +122,10 @@ par(mfrow=c(1,2))
 acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 
 
-#on suspecte l'existance d'une tendance déterministe : test de stationarité
+#on suspecte l'existance d'une tendance déterministe nous allons donc 
+# faire un test de stationarité de Dickey Fuller augmenté
 
-### 2-b) Test de Ljung-Box ----
-
-#nous commençons par effectuer un test de Ljung-Box pour vérifier 
-#Si les résidus de l’ADF sont autocorrélés, cela biaisera les résultats du test.
-#Sinon On pourrait conclure à tort qu’une série est stationnaire.
-
-#    '''La fonction suivante effectue un test de ***Ljung-Box*** sur une série 
-#     temporelle pour vérifier l'autocorrélation des résidus d'un modèle ajusté 
-#    '''
-
-#   '''H0 (hypothèse nulle) : Il n'y a pas d'autocorrélation dans les résidus. Les 
-#   '''résidus sont indépendants (aucune relation entre eux).
-
-#   '''H1 (hypothèse alternative) : Il existe une autocorrélation dans les 
-#   '''résidus. Les résidus ne sont pas indépendants.
-
-Qtests  <- function(var, k, fitdf=0) {
-  pvals <- apply(matrix(1:k), 1, FUN=function(l) {
-    pval <- if (l<=fitdf) NA else Box.test(var, lag=l, type="Ljung-Box", fitdf=fitdf)$p.value # Le test de Ljung-Box teste l'hypothèse nulle selon laquelle les retards jusqu'à lag inclusivement de l'autocorrélation sont nuls
-    return(c("lag"=l,"pval"=pval))
-  })
-  return(t(pvals))
-}
-
-# Test
-Qtests (train_data$indice, 20,0) 
-#Resultat: Il y'a autocorellatoon entre les données
-
-
-
-##### 2-c) Test de stationnarité de la serie
+##### 2-b) Test de stationnarité de la serie
 
 ## a- Test de Dickey Fuller augmenté
 
@@ -148,6 +138,7 @@ Qtests (train_data$indice, 20,0)
 
 
 ##Première méthode
+
 
 # Fonction combinée ADF avec vérification des résidus
 adfTest_valid_combined <- function(var, kmax, adftype) {
@@ -162,7 +153,7 @@ adfTest_valid_combined <- function(var, kmax, adftype) {
   residuals_adf <- adf_test@res
   
   # Tester les résidus du modèle ajusté pour l'autocorrélation
-  pvals <- Qtests(residuals_adf, 20, fitdf = length(adf_test@teststat))[, 2]
+  pvals <- Qtests(residuals_adf, 24, fitdf = length(adf_test@teststat))[, 2]
   
   if (sum(pvals < 0.05, na.rm = TRUE) == 0) {
     # Si les résidus sont indépendants (pas d'autocorrélation)
@@ -174,21 +165,21 @@ adfTest_valid_combined <- function(var, kmax, adftype) {
     # Augmenter les lags et réajuster le modèle 
     
     pvals_new <- pvals
-    while (sum(pvals_new < 0.05, na.rm = TRUE) == 0){
+    while (sum(pvals_new < 0.05, na.rm = TRUE) != 0){
       k <- k + 1
       print(paste("Trying with ", k, " lags."))
-      
+    
       adf_test_new <- ur.df(var, type = adftype, lags = k)
       residuals_adf_new <- adf_test_new@res
-      
+    
       # Vérifier les résidus du modèle ajusté
-      pvals_new <- Qtests(residuals_adf_new, 20, fitdf = length(adf_test_new@teststat))[, 2]
-      
+      pvals_new <- Qtests(residuals_adf_new, 24, fitdf = length(adf_test_new@teststat))[, 2]
+    
       if (sum(pvals_new < 0.05, na.rm = TRUE) == 0) {
         print("Adjusted model: Residuals are now independent.")
       }else {
-        print("Residuals still show autocorrelation even after adjustment.")
-        adf_test <- adf_test_new
+      print("Residuals still show autocorrelation even after adjustment.")
+      adf_test <- adf_test_new
       }
     }
   }
@@ -196,12 +187,13 @@ adfTest_valid_combined <- function(var, kmax, adftype) {
   return(adf_test)  # Retourner le test ADF final
 }
 
+
 # Exemple d'application sur une série de données
-adfTest_valid_combined(train_data$indice, kmax = 20, adftype = "drift")
+adfTest_valid_combined(train_data$indice, kmax = 24, adftype = "drift")
 
 ### Deuxieme methode
 
-##### function qui cherche le lag idéal pour la régression de Dickey Fuller
+# function qui cherche le lag idéal pour la régression de Dickey Fuller
 adfTest_valid <- function(var, kmax, adftype){
   k <- 0
   noautocorr <- 0 # est-ce que les résidus sont un BB faible ?
@@ -226,43 +218,44 @@ best_adf <- adfTest_valid(var=train_data$indice,kmax=24,adftype="ct") # ADF with
 best_adf
 
 
-
-  ### 2-d) Elimination de la stationnarité
+  ### 2-c) Elimination de la stationnarité
 
 # Nous allons différencier la série initiale avec un lag de 1 et nommer sa transformé dindice
 
-train_data["dindice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ordre 1
-train_copie["dindice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ordre 1
+train_data["d_indice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ordre 1
+train_copie["d_indice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ordre 1
 
 
 
 ## Représentation des autocorrélations simples des séries indice et dindice(serie différenciée)
 
 windows()
+
 par(mfrow=c(1,2))
 acf(train_data$indice,lag.max=24,main="",xaxt = "n")
 axis(1, at = 0:24, labels = FALSE)
 text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, adj = 1, xpd = TRUE)
-acf(train_data$dindice[-1],lag.max=24,main="",xaxt = "n")
+
+acf(train_data$d_indice[-1],lag.max=24,main="",xaxt = "n")
 axis(1, at = 0:24, labels = FALSE)
 text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, adj = 1, xpd = TRUE)
 
 
-## 2-e) Test de stationnarité de la série dindice
+## 2-d) Test de stationnarité de la série différenciée d_indice
 
-best_dadf <- adfTest_valid(var=train_data$dindice,kmax=24,adftype="ct") # ADF with 3 lags: residuals OK? OK
+best_dadf <- adfTest_valid(var=train_data$d_indice,kmax=24,adftype="ct") # ADF with 3 lags: residuals OK? OK
 
 best_dadf
 
 ### Nous constatons que la série différencié est stationnaire
 
 
-## Utilisation des autres tests pour conforter les résultats
+## Utilisation des autres tests pour confirmer les résultats précédents
 # KPSS test:
-kpss.test(train_data$dindice[-1]) # stationarité
-#
-pp.test(train_data$dindice[-1])# stationnarité
+kpss.test(train_data$d_indice[-1]) # stationarité
+pp.test(train_data$d_indice[-1])# stationnarité
 
+#la stationnarité et bel et bien vérifiée
 
 # ========================================================================= #
 # =============================== Question 3 ============================== #
@@ -277,7 +270,7 @@ serie_brute <- ggplot(data = train_copie[-1,], aes(x = Periode, y = indice)) +
   labs(x = "", y = "Indice", title = "")+
   theme(panel.background = element_rect(fill = "lightgrey"))
 
-serie_diff <- ggplot(data = train_copie[-1,], aes(x = Periode, y = dindice)) +
+serie_diff <- ggplot(data = train_copie[-1,], aes(x = Periode, y = d_indice)) +
   geom_line() +
   labs(x = "", y = "Indice différencié", title = "")+
   theme(panel.background = element_rect(fill = "lightgrey"))
@@ -289,7 +282,7 @@ grid.arrange(serie_brute, serie_diff, nrow = 1)
 # **************************************************************************#
 #                                                                           #
 #                                                                           #
-#                         PARTIE II : Mod?les ARMA                          #
+#                         PARTIE II : Modèles ARMA                          #
 #                                                                           #
 #                                                                           #
 # **************************************************************************#
@@ -299,3 +292,163 @@ grid.arrange(serie_brute, serie_diff, nrow = 1)
 # ========================================================================= #
 
 ###Choix du modèle ARMA(p,q) et vérification de la validité
+
+# Pour le choix des ordres p et q, nous allons nous servir des fonctions d'autocorrélation (simples et partielles)
+
+windows()
+par(mfrow=c(1,2))
+acf(train_data$d_indice[-1],20,main="",xaxt = "n")
+axis(1, at = 0:20, labels = FALSE)
+text(x = 0:20, y = par("usr")[3] - 0.05, 
+     labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
+pacf(train_data$d_indice[-1],20,main="",xaxt = "n")#on regarde jusqu'à 20 mois de retard
+axis(1, at = 1:20, labels = FALSE)
+text(x = 1:20, y = par("usr")[3] - 0.02, 
+     labels = 1:20, srt = 90, adj = 1, xpd = TRUE)
+
+pmax=2 ; qmax=2
+
+
+## Estimation de tous les modèles possibles
+
+# Initialisation de la liste des modèles valides : ceux ayant des bruits blancs comme résidus et ayant des ordres pet q bien spécifiés
+
+# Nous explores tous les couples (p, q) entre 0 et pmax/qmax, puis nous testons si le modèle ARIMA(p, 0, q) :
+  
+# a. Peut être estimé sans erreur.
+
+# b. Produit des résidus proches du bruit blanc.
+
+# c. A des coefficients significatifs.
+
+# d. Et est raisonnablement parcimonieux (AR ou MA pur si possible).
+
+
+
+modeles_valides <- list()
+nb <-0
+for (p in 0:pmax) {
+  for (q in 0:qmax) {
+    modele <- try(arima(train_data$d_indice[-1], order = c(p, 0, q), 
+                        include.mean = FALSE)) # Tentative d'estimation de l'ARIMA
+    if ((sum(is.na(sqrt(diag(modele$var.coef))))==0) & (all(Qtests(
+              modele$residuals, 24, fitdf = p+q)[,2] > 0.05, na.rm = TRUE)
+               )) { # on teste si on a de bons résidus et si les écarts types sont bien estimés
+      validite <- abs(modele$coef/sqrt(diag(modele$var.coef)))>1.96 # test de validité du modèle (significativité des coefficients)
+      ajout <- FALSE
+      if ((p==0 | q==0) & (validite[length(validite)])) {ajout <- TRUE}
+      else if ((validite[p]) & (validite[p+q])) {ajout <- TRUE}
+      if (ajout){
+        nb <- nb + 1
+        modeles_valides <- append(modeles_valides, list(list(paste("modele_", nb, sep = ""), p, q)))
+      }
+    }
+  }
+}
+
+
+modeles_valides
+
+
+# Les modèles ayant réussi à ces test sont les suivants:
+   #--------MA(0,2), ARMA(1,2), ARMA(2,1)-----------#
+# Nous allons projeter ces modèles sur les données d'entrainement
+# afin de les comparer puis de choisir le meilleur modèle selon 
+# les critères AIC et BIC.
+
+#==============================================================================#
+# p = 0, q = 2
+ma2 <- estim <- arima(train_data$d_indice,c(0,0,2))
+
+# p=1,q=2
+ar1ma2 <- estim <- arima(train_data$d_indice,c(1,0,2))
+
+# p=2, q=1
+ar2ma1 <- estim <- arima(train_data$d_indice,c(2,0,1))
+#==============================================================================#
+
+#Choix du meilleur modèles parmis 03 modèles valides selon les critères AIC et BIC
+
+models <- list(ma2 = ma2, ar1ma2 = ar1ma2, ar2ma1 = ar2ma1)
+scores <- sapply(models, function(mod) {
+  c(AIC = AIC(mod), BIC = BIC(mod), logLik = logLik(mod))})
+print(scores)
+
+# Trouver les colonnes avec les valeurs minimales
+min_aic_model <- colnames(scores)[which.min(scores["AIC", ])]
+min_bic_model <- colnames(scores)[which.min(scores["BIC", ])]
+
+# Affichage propre
+cat("meilleur modèle selon AIC :", min_aic_model, "\n")
+cat("meilleur modèle selon BIC :", min_bic_model, "\n")
+
+
+
+#-----_______Meilleur modèles:_______-------#  
+#          __ AIC: ARMA(1,2)  __
+#           _   BIC: MA(2)    _
+
+
+# Test de vraisemblance : MA(2) VS ARMA(1,2)
+# Afin de choisir un des deux modèles, nous allons effectuer
+#un test de vraissemblance avec les hypothèses suivantes:
+# Ho: le modèle ma2 suffit (le terme AR(1) n’apporte rien).
+# H1: le modèle ar1ma2 est meilleur (le terme AR(1) améliore la vraisemblance).
+
+#==============================================================================#
+
+# Calcul de la statistique du test de vraisemblance (likelihood ratio test)
+ll_ratio <- 2 * (scores["logLik", "ar1ma2"] - scores["logLik", "ma2"])
+df_diff <- (length(coef(ar1ma2)) - length(coef(ma2))) 
+
+# Vérification de la statistique du test et du p-value
+p_value <- 1 - pchisq(ll_ratio, df_diff)
+cat("P-value : ", p_value, "\n")
+
+#  -- La p-value(0,04) est inférieure à 5% donc la
+# différence entre les deux modèles est significatives.
+#  -- Le modèle ARMA(1,2) permet de mieux
+#   expliquer les données que le modèle  MA(2).
+#==============================================================================#
+
+
+# ____________________________Modèle:ARMA(1,2)_________________________________#
+
+
+#==============================================================================
+##---------5. Exprimer le modèle ARIMA(p,d,q) pour la série choisie------------#
+#==============================================================================
+
+
+# _____________________Modèle de base :ARIMA(1,1,2)_____________________________#
+arima112 <- arima(train_data$indice,c(1,1,2),include.mean=F)
+
+
+#Test de validité des résidus 
+all(Qtests(arima112$residuals, 24, fitdf=3)[,2]>0.05,na.rm = TRUE)
+# - Resultat: TRUE ie toute les p-values sont inférieures à 0.05
+# - conclusion:les résidus ne montrent pas d'autocorrélation significative p
+#   pour tous les lags testés, indiquant que le modèle ajuste bien les données. 
+
+
+# Significativité des coefficients
+arima112$coef/sqrt(diag(arima112$var.coef))
+abs(arima112$coef/sqrt(diag(arima112$var.coef)))>1.96
+# - But : Teste si les coefficients du modèle sont supérieure à 1,96
+# - Resultat: TRUE, tous les coef sont supérieur à 1,96
+# conclusion:Les composantes ar1, ma1, ma2 apporte des informations
+# significatives, donc le modèle ARIMA(1,1,2) semble etre bien specifié
+
+
+## Représentation des résidus ainsi que des autocorrélations associés
+
+par(mfrow=c(1,2))
+
+plot(arima112$residuals,main="",xlab="",ylab="",col="darkblue")
+acf(coredata(arima112$residuals),lag.max = 20,main="",xaxt = "n")
+# Ajouter l'axe des abscisses avec des graduations de 1 en 1 sans labels
+axis(1, at = 0:20, labels = FALSE)
+# Ajouter les labels inclinés à 90 degrés
+# Utiliser la fonction text() pour ajouter les labels inclinés
+text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
+
