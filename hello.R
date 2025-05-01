@@ -22,6 +22,7 @@ library(forecast)
 library(tseries)
 library(lubridate)
 library(urca)
+library(lubridate)
 
 
 ###### I- Importation du dataset  
@@ -375,7 +376,8 @@ arima112$coef/sqrt(diag(arima112$var.coef))
 abs(arima112$coef/sqrt(diag(arima112$var.coef)))>1.96
 # - But : Teste si les coefficients du modèle sont supérieure à 1,86
 # - Resultat: TRUE, tous les coef sont supérieur à 1,96
-# - conclusion:Nos coefficients sont tous significatif au seil de 5% 
+# - conclusion:Les composantes ar1, ma1, ma2 apporte des informations 
+#          significatives, donc ARIMA(1,1,2) semble bien specifié
 
 
 
@@ -392,8 +394,105 @@ axis(1, at = 0:20, labels = FALSE)
 text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
 
 
+##_______________Verifier l'inversibilité du ARIMA(1,1,2)______________________#
+
+#==============================================================================#
+#  - Selection des coefs ma1 et ma2
+#  - Calcul ds racines du polynome  c(1, -0.3903 ,-0.2266)
+#  - On inverses les racines c(1.409179+0i, -3.131788-0i)
+#  - On obtient les modules  c(1.409179,3.131788)
+#  - toute les racines sont à l'xtérieur du cercle unité
+
+summary(arima112)
+# Extraction des coefficients 
+coefs <- arima112$coef
+theta <- c(1, coefs["ma1"], coefs["ma2"])
+
+# Calcul des racines du polynôme
+roots <- polyroot(theta)
+print(roots)
+
+# Calcul des racines du polynôme
+roots <- polyroot(theta)
+print(roots)
 
 
+#___Conclusion:Modèle identifiable, correctement estimé,
+#              fournit des predictions fiable et robuste aux erreurs passées____
+#==============================================================================#
+
+#******************************************************************************#
+#*                        Partie 3: Prediction                                *#
+#******************************************************************************#
+
+
+
+#6. Ecrire l’équation vérifiée par la région de confiance de niveau α sur les
+#     valeurs futures (XT+1,XT+2).
+
+#**************************(voir document)*************************************#
+
+#7. Préciser les hypothèses utilisées pour obtenir cette région.
+
+#**************************(voir document)*************************************#
+
+# Convertir la série en data frame pour ggplot
+data_frame <- data.frame(valeurs = as.numeric(arima112$residuals))
+
+
+#8. Représenter graphiquement cette région pour α = 95%. Commenter.
+
+# ---- PRÉDICTION SUR 5 MOIS ----
+# Prédiction avec intervalles de confiance
+pred <- forecast(arima112, h = 5, level = 95)
+
+# Affichage des valeurs prédites et intervalles
+print(pred)
+
+# ---- EXTRACTION DES DONNÉES TEST ----
+# Assure-toi que test_data$d_indice contient au moins 5 valeurs
+test_vals <- test_data$indice[1:5]
+
+# ---- TRAÇONS LE GRAPHE ----
+
+
+# Séries complètes à tracer
+valeurs_observées <- c(train_data$indice, rep(NA, 5))
+valeurs_test <- c(rep(NA, length(train_data$indice)), test_vals)
+valeurs_prédites <- c(rep(NA, length(train_data$indice)), as.numeric(pred$mean))
+IC_up <- c(rep(NA, length(train_data$indice)), pred$upper)
+IC_low <- c(rep(NA, length(train_data$indice)), pred$lower)
+
+# Créer une séquence de dates mensuelles
+date_index <- seq(as.Date("1990-01-01"), by = "month", length.out = length(train_data$d_indice) + 5)
+
+# Construire le data.frame pour le graphique
+df_plot <- data.frame(
+  Date =date_index ,
+  Train = c(train_data$indice, rep(NA, 5)),
+  Test = c(rep(NA, length(train_data$indice)), head(test_data$indice, 5)),
+  Prévisions = c(rep(NA, length(train_data$indice)), as.numeric(pred$mean)),
+  IC_low = c(rep(NA, length(train_data$indice)), as.numeric(pred$lower)),
+  IC_up = c(rep(NA, length(train_data$indice)), as.numeric(pred$upper))
+)
+
+
+
+# Tracer le graphique
+ggplot(df_plot, aes(x = Date)) +
+  geom_line(aes(y = Train, color = "Train")) +
+  geom_line(aes(y = Test, color = "Test")) +
+  geom_line(aes(y = Prévisions, color = "Prévisions")) +
+  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "pink", alpha = 0.3) +
+  annotate("rect",
+           xmin = df_plot$Date[length(train_data$indice) + 1],
+           xmax = max(df_plot$Date),
+           ymin = -Inf, ymax = Inf,
+           fill = "lightgrey", alpha = 0.3) +
+  scale_color_manual(values = c("Train" = "cyan", "Test" = "blue", "Prévisions" = "deeppink")) +
+  labs(title = "Prévisions ARIMA vs Données réelles",
+       x = "Date", y = "Indice", color = "Légende") +
+  theme_minimal()
 
 
 
