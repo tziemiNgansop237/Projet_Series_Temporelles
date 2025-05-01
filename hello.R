@@ -279,7 +279,7 @@ modeles_valides <- list()
 nb <-0
 for (p in 0:pmax) {
   for (q in 0:qmax) {
-    modele <- try(arima(train_data$dindice[-1], order = c(p, 0, q), 
+    modele <- try(arima(train_data$d_indice[-1], order = c(p, 0, q), 
                         include.mean = FALSE)) # Tentative d'estimation de l'ARIMA
     if ((sum(is.na(sqrt(diag(modele$var.coef))))==0) & (all(Qtests(
               modele$residuals, 24, fitdf = p+q)[,2] > 0.05, na.rm = TRUE)
@@ -300,81 +300,97 @@ for (p in 0:pmax) {
 modeles_valides
 
 
-# Les modèles ayant réussi à ces test sont les suivants: ARIMA(0,1,3), ARIMA(1,1,2), ARIMA(2,1,1),ARIMA(4,1,0); 
+# Les modèles ayant réussi à ces test sont les suivants:
+   #--------MA(0,2), ARMA(1,2), ARMA(2,1)-----------#
+
+#==============================================================================#
+# p = 0, q = 2
+ma2 <- estim <- arima(train_data$d_indice,c(0,0,2))
+
+# p=1,q=2
+ar1ma2 <- estim <- arima(train_data$d_indice,c(1,0,2))
+
+# p=2, q=1
+ar2ma1 <- estim <- arima(train_data$d_indice,c(2,0,1))
+#==============================================================================#
+
+#Choix du meilleur modèles parmis 03 modèles valides par les critères AIC et BIC
+
+models <- list(ma2 = ma2, ar1ma2 = ar1ma2, ar2ma1 = ar2ma1)
+scores <- sapply(models, function(mod) {
+  c(AIC = AIC(mod), BIC = BIC(mod), logLik = logLik(mod))})
+print(scores)
+
+# Trouver les colonnes avec les valeurs minimales
+min_aic_model <- colnames(scores)[which.min(scores["AIC", ])]
+min_bic_model <- colnames(scores)[which.min(scores["BIC", ])]
+
+# Affichage propre
+cat("meilleur modèle selon AIC :", min_aic_model, "\n")
+cat("meilleur modèle selon BIC :", min_bic_model, "\n")
 
 
-## Choix du meilleur modèles parmis les modèles valides à l'aide des critères AIC et BIC
 
-#pqs <- expand.grid(0:pmax,0:qmax) #combinaisons possibles de p<=p* et q<=q*
-mat <- matrix(NA, nrow=5, ncol=4)
-rownames(mat) <- paste0("p=",c(0:4)) #renomme les lignes
-colnames(mat) <- paste0("q=",c(0:3)) #renomme les colonnes
-AICs <- mat #matrice ou assigner les AIC
-BICs <- mat #matrice ou assigner les BIC
-paire_pq <- list(c(0, 3), c(1, 2), c(2, 1), c(4, 0))
-for (pair in paire_pq){
-  p <- pair[1]
-  q <- pair[2]
-    estim <- try(arima(base$dindice[-1],c(p,0,q), include.mean=F)) #tente d'estimer l'ARIMA
-    AICs[p+1,q+1] <- if (class(estim)=="try-error") NA else estim$aic
-    BICs[p+1,q+1] <- if (class(estim)=="try-error") NA else BIC(estim)
-}
-AICs
-BICs
-
-AICs==min(AICs,na.rm = TRUE) # ce critère donne un modèle ARMA(0,3) 
-#
-BICs==min(BICs,na.rm = TRUE) # ce critère donne un modèle ARMA(0,3)
+#-----_______Meilleur modèles:_______-------#  
+#          __ AIC: ARMA(1,2)  __
+#           _   BIC: MA(2)    _
 
 
-## 5. Exprimer le modèle ARIMA(p,d,q) pour la série choisie.----
+# Test de vraisemblance : MA(2) VS ARMA(1,2)
 
-arima013 <- arima(base$indice,c(0,1,3),include.mean=F)
+#==============================================================================#
+
+# Calcul de la statistique du test de vraisemblance (likelihood ratio test)
+ll_ratio <- 2 * (scores["logLik", "ar1ma2"] - scores["logLik", "ma2"])
+df_diff <- (length(coef(ar1ma2)) - length(coef(ma2))) 
+
+# Vérification de la statistique du test et du p-value
+p_value <- 1 - pchisq(ll_ratio, df_diff)
+cat("P-value : ", p_value, "\n")
+
+#  - La p-value  est significative à 5%, 
+#  - Le modèle ARMA(1,2) permet de mieux expliquer les données que le modèle  MA(2).
+#==============================================================================#
 
 
-#TEST DE VALIDITE DES RESIDUS
-all(Qtests(arima013$residuals, 24, fitdf=3)[,2]>0.05,na.rm = TRUE) # True
+# ____________________________Modèle:ARMA(1,2)_________________________________#
+
+
+##---------5. Exprimer le modèle ARIMA(p,d,q) pour la série choisie------------#
+
+
+# _____________________Modèle de base :ARIMA(1,1,2)_____________________________#
+arima112 <- arima(train_data$indice,c(1,1,2),include.mean=F)
+
+
+#Test de validité des résidus 
+all(Qtests(arima112$residuals, 24, fitdf=3)[,2]>0.05,na.rm = TRUE)
+# - Resultat: TRUE ie toute les p-values sont inférieures à 0.05
+# - conclusion:les résidus ne montrent pas d'autocorrélation significative p
+#   pour tous les lags testés, indiquant que le modèle ajuste bien les données. 
 
 
 # Significativité des coefficients
-arima013$coef/sqrt(diag(arima013$var.coef))
-abs(arima013$coef/sqrt(diag(arima013$var.coef)))>1.96
+arima112$coef/sqrt(diag(arima112$var.coef))
+abs(arima112$coef/sqrt(diag(arima112$var.coef)))>1.96
+# - But : Teste si les coefficients du modèle sont supérieure à 1,86
+# - Resultat: TRUE, tous les coef sont supérieur à 1,96
+# - conclusion:Nos coefficients sont tous significatif au seil de 5% 
+
+
 
 ## Représentation des résidus ainsi que des autocorrélations associés
-windows()
+
 par(mfrow=c(1,2))
-plot(arima013$residuals,main="",xlab="",ylab="",col="darkblue")
-acf(coredata(arima013$residuals),lag.max = 20,main="",xaxt = "n")
+
+plot(arima112$residuals,main="",xlab="",ylab="",col="darkblue")
+acf(coredata(arima112$residuals),lag.max = 20,main="",xaxt = "n")
 # Ajouter l'axe des abscisses avec des graduations de 1 en 1 sans labels
 axis(1, at = 0:20, labels = FALSE)
 # Ajouter les labels inclinés à 90 degrés
 # Utiliser la fonction text() pour ajouter les labels inclinés
 text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
 
-
-## Coefficients du modèle
-
-summary(arima013)
-
-## Vérification de l'inversibilité du modèle
-# Coefficients theta
-theta <- c(1, -0.4324, -0.2611, 0.1481)
-
-# Calcul des racines
-roots <- polyroot(theta)
-
-roots
-
-# Vérification si les racines sont en dehors du cercle unité
-outside_unit_circle <- abs(roots) > 1
-
-if(all(outside_unit_circle)) {
-  print("Le modèle est inversible.")
-} else {
-  print("Le modèle n'est pas inversible.")
-}
-
-abs(roots)
 
 
 
