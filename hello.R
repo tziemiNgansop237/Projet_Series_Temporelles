@@ -375,7 +375,8 @@ arima112$coef/sqrt(diag(arima112$var.coef))
 abs(arima112$coef/sqrt(diag(arima112$var.coef)))>1.96
 # - But : Teste si les coefficients du modèle sont supérieure à 1,86
 # - Resultat: TRUE, tous les coef sont supérieur à 1,96
-# - conclusion:Nos coefficients sont tous significatif au seil de 5% 
+# - conclusion:Les composantes ar1, ma1, ma2 apporte des informations 
+#          significatives, donc ARIMA(1,1,2) semble bien specifié
 
 
 
@@ -391,6 +392,48 @@ axis(1, at = 0:20, labels = FALSE)
 # Utiliser la fonction text() pour ajouter les labels inclinés
 text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
 
+
+##_______________Verifier l'inversibilité du ARIMA(1,1,2)______________________#
+
+#==============================================================================#
+#  - Selection des coefs ma1 et ma2
+#  - Calcul ds racines du polynome  c(1, -0.3903 ,-0.2266)
+#  - On inverses les racines c(1.409179+0i, -3.131788-0i)
+#  - On obtient les modules  c(1.409179,3.131788)
+#  - toute les racines sont à l'xtérieur du cercle unité
+
+summary(arima112)
+# Extraction des coefficients 
+coefs <- arima112$coef
+theta <- c(1, coefs["ma1"], coefs["ma2"])
+
+# Calcul des racines du polynôme
+roots <- polyroot(theta)
+print(roots)
+
+# Calcul des racines du polynôme
+roots <- polyroot(theta)
+print(roots)
+
+
+#___Conclusion:Modèle identifiable, correctement estimé,
+#              fournit des predictions fiable et robuste aux erreurs passées____
+#==============================================================================#
+
+#******************************************************************************#
+#*                        Partie 3: Prediction                                *#
+#******************************************************************************#
+
+
+
+#6. Ecrire l’équation vérifiée par la région de confiance de niveau α sur les
+#     valeurs futures (XT+1,XT+2).
+
+#**************************(voir document)*************************************#
+
+#7. Préciser les hypothèses utilisées pour obtenir cette région.
+
+#**************************(voir document)*************************************#
 
 
 
