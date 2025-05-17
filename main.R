@@ -16,6 +16,7 @@
 require(zoo) #format de serie temporelle pratique et facile d'utilisation
 require(tseries)
 
+library(patchwork)
 library(dplyr)
 library(readxl)
 library(ellipse)
@@ -34,7 +35,7 @@ chemin <- "C:/Users/damso/Desktop/p/IPI_202501.xls"
 base <- read_excel(chemin)
 
 summary(base)
-
+#==============================================================================#
 
 # **************************************************************************#
 #                                                                           #
@@ -43,13 +44,14 @@ summary(base)
 #                                                                           #
 #                                                                           #
 # **************************************************************************#
+#==============================================================================#
 
 # ========================================================================= #
 # ============================= Question 1 ================================ #
 # ========================================================================= #
 
 
-##### 1-formatage des variables d'interêts
+###______-formatage des variables d'interêts______#
 
 ## Selection de nos variable d'interêt: temps et données informatique( CI)
 data <- base %>% select(c(`NAF rev. 2`,`CZ`))
@@ -62,7 +64,7 @@ data$Periode <- substr(data$Periode, 2, nchar(data$Periode))
 data$Periode <-  as.Date(paste0(data$Periode, "01"), format = "%Y%m%d")
 
 
-#####  Définition des données d'entrainement et de test 
+#####___Définition des données d'entrainement et de test__#
 
 ## Etant données que ARMA est un modèle à court terme  
 ## nous allons Garder 12 observations pour les test #
@@ -83,7 +85,7 @@ test_data <- data %>%
 #    ''' Copie de la train_data '''
 
 train_copie <- train_data
-
+#==============================================================================#
 
 
 # ========================================================================= #
@@ -91,6 +93,7 @@ train_copie <- train_data
 # ========================================================================= #
 
 
+#==============================================================================#
 ### 2-a)Vérification de la saisonnalité de la série temporelle
 
 ## Puisque c'est une série mensuelle, nous allons vérifier la saisonnalité 
@@ -105,6 +108,7 @@ isSeasonal(ts_data, test = "qs")  # "qs" = test basé sur la variance intra-pér
 #_____________________________#___________________________#
 
 
+#==============================================================================#
 ### 2-a) Visualisation des données avant traitement
 
 windows()
@@ -124,6 +128,7 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 
 #on suspecte l'existance d'une tendance déterministe nous allons donc 
 # faire un test de stationarité de Dickey Fuller augmenté
+#==============================================================================#
 
 ##### 2-b) Test de stationnarité de la serie
 
@@ -137,7 +142,7 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 
 
 
-##Première méthode
+##____________Première méthode________________#
 
 
 # Fonction combinée ADF avec vérification des résidus
@@ -186,12 +191,13 @@ adfTest_valid_combined <- function(var, kmax, adftype) {
   
   return(adf_test)  # Retourner le test ADF final
 }
-
+#==============================================================================#
 
 # Exemple d'application sur une série de données
 adfTest_valid_combined(train_data$indice, kmax = 24, adftype = "drift")
+#==============================================================================#
 
-### Deuxieme methode
+###__________Deuxieme méthode_________#
 
 # function qui cherche le lag idéal pour la régression de Dickey Fuller
 adfTest_valid <- function(var, kmax, adftype){
@@ -210,7 +216,7 @@ adfTest_valid <- function(var, kmax, adftype){
   }
   return(test_adf)
 }
-
+#==============================================================================#
 
 ## Application de la fonction pour trouver le lag efficace pour le test ADF
 best_adf <- adfTest_valid(var=train_data$indice,kmax=24,adftype="ct") # ADF with 4 lags: residuals OK? OK
@@ -277,7 +283,7 @@ serie_diff <- ggplot(data = train_copie[-1,], aes(x = Periode, y = d_indice)) +
 
 # Affichage des deux graphiques côte à côte
 grid.arrange(serie_brute, serie_diff, nrow = 1)
-
+#==============================================================================#
 
 # **************************************************************************#
 #                                                                           #
@@ -286,6 +292,8 @@ grid.arrange(serie_brute, serie_diff, nrow = 1)
 #                                                                           #
 #                                                                           #
 # **************************************************************************#
+
+#==============================================================================#
 
 # ========================================================================= #
 # =============================== Question 4 ============================== #
@@ -452,3 +460,177 @@ axis(1, at = 0:20, labels = FALSE)
 # Utiliser la fonction text() pour ajouter les labels inclinés
 text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
 
+
+##_______________Verification de l'inversibilité du ARIMA(1,1,2)______________________#
+
+
+#==============================================================================#
+#  POur cela, nous allons vérifier si les racines du polynome ARMA(1,1,2) sont à l'extérieur du cercle unité
+# - on commence par extracter les coefficients du modèle ARIMA
+# -puis, on Selectionne des coefs ma1 et ma2
+#  -ensuite on Calcule les racines du polynome
+
+summary(arima112)
+# Extraction des coefficients 
+coefs <- arima112$coef
+theta <- c(1, coefs["ma1"], coefs["ma2"])
+
+# Calcul des racines du polynôme
+roots <- polyroot(theta)
+print(roots)
+
+#  - on obtient les racines c(1.409179+0i, -3.131788-0i)
+#  - leurs modules sont respectivements 1.409179 et 3.131788
+#  - toute les racines sont à l'extérieur du cercle unité
+
+#___Conclusion: Le Modèle ARIMA(1,1,2) est identifiable et correctement estimé____#
+#___Il fournit des predictions fiable et robuste aux erreurs passées____#
+
+
+#==============================================================================#
+
+#******************************************************************************#
+#*                        Partie 3: Prediction                                *#
+#******************************************************************************#
+
+
+#==============================================================================#
+#6. Ecrire l’équation vérifiée par la région de confiance de niveau α sur les
+#___valeurs futures (XT+1,XT+2).
+
+#**************************(voir document)*************************************#
+
+#7. Préciser les hypothèses utilisées pour obtenir cette région.
+
+#**************************(voir document)*************************************#
+
+# Convertir la série en data frame pour ggplot
+data_frame <- data.frame(valeurs = as.numeric(arima112$residuals))
+
+
+#==============================================================================#
+#__8. Représenter graphiquement cette région pour α = 95%. Commenter.
+
+#___---- PRÉDICTION SUR 5 MOIS ----___#
+#__Prédiction avec intervalles de confiance
+pred <- forecast(arima112, h = 5, level = 95)
+
+#__Affichage des valeurs prédites et intervalles
+print(pred)
+
+# ---- EXTRACTION DES DONNÉES TEST ----
+# Pour cela, nous vérifions d'abord si test_data$d_indice contient bien au moins 5 valeurs
+test_vals <- test_data$indice[1:5]
+
+#________---- TRAÇONS LE GRAPHE ----_______#
+
+
+#__Séries complètes à tracer
+valeurs_observées <- c(train_data$indice, rep(NA, 5))
+valeurs_test <- c(rep(NA, length(train_data$indice)), test_vals)
+valeurs_prédites <- c(rep(NA, length(train_data$indice)), as.numeric(pred$mean))
+IC_up <- c(rep(NA, length(train_data$indice)), pred$upper)
+IC_low <- c(rep(NA, length(train_data$indice)), pred$lower)
+
+#__Création d'une séquence de dates mensuelles
+date_index <- seq(as.Date("1990-01-01"), by = "month", length.out = length(train_data$d_indice) + 5)
+
+#__Construction d'un DataFrame pour le graphique
+df_plot <- data.frame(
+  Date =date_index ,
+  Train = c(train_data$indice, rep(NA, 5)),
+  Test = c(rep(NA, length(train_data$indice)), head(test_data$indice, 5)),
+  Prévisions = c(rep(NA, length(train_data$indice)), as.numeric(pred$mean)),
+  IC_low = c(rep(NA, length(train_data$indice)), as.numeric(pred$lower)),
+  IC_up = c(rep(NA, length(train_data$indice)), as.numeric(pred$upper))
+)
+
+
+
+
+#==============================================================================#
+#___Graphique de la série temporelle avec prévisions et intervalles de confiance
+windows()
+ggplot(df_plot, aes(x = Date)) +
+  geom_line(aes(y = Train), color = "black", size = 0.4) +
+  geom_line(aes(y = Test), color = "blue", size = 0.5, linetype = "dashed") +
+  geom_line(aes(y = Prévisions), color = "red", size = 0.6) +
+  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "gray80", alpha = 0.5) +
+  annotate("rect",
+           xmin = df_plot$Date[length(train_data$indice) + 1],
+           xmax = max(df_plot$Date),
+           ymin = -Inf, ymax = Inf,
+           fill = "gray90", alpha = 0.4) +
+  labs(x = "Date", y = "Indice de production manufacturière") +
+  theme_minimal(base_family = "serif") +
+  theme(
+    panel.grid.major = element_line(color = "gray90", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9),
+    legend.position = "none"  #nous retirons la légende pour un style académique propre
+  )
+
+#==============================================================================#
+pred <- forecast(arima112, h = 2, level = 95)
+
+# Suppose une corrélation rho entre les deux prévisions
+rho <- 0.8  # corrélation supposée
+sigma1 <- (pred$upper[1] - pred$lower[1]) / (2 * 1.96)
+sigma2 <- (pred$upper[2] - pred$lower[2]) / (2 * 1.96)
+
+# Calcul de la covariance à partir des écarts-types et de la corrélation
+cov_val <- rho * sigma1 * sigma2
+
+# Matrice de covariance avec corrélation
+Sigma <- matrix(c(sigma1^2, cov_val,
+                  cov_val, sigma2^2), nrow = 2)
+
+# Centre des prévisions
+mu <- c(as.numeric(pred$mean[1]), as.numeric(pred$mean[2]))
+
+
+ellipse_pts <- ellipse(Sigma, centre = mu, level = 0.95)
+ellipse_df <- as.data.frame(ellipse_pts)
+
+
+################################################
+# Ton premier graphique : ellipse
+p1 <- ggplot(ellipse_df, aes(x = x, y = y)) +
+  geom_path(color = "black") +
+  geom_point(aes(x = mu[1], y = mu[2]), color = "black", size = 2) +
+  labs(x = "Prévision Mars 2022", y = "Prévision Avril 2022",
+       title = "Ellipse de confiance jointe ") +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9)
+  
+
+# Ton deuxième graphique : série temporelle
+p2 <- ggplot(df_plot, aes(x = Date)) +
+  geom_line(aes(y = Train), color = "black", size = 0.4) +
+  geom_line(aes(y = Test), color = "blue", size = 0.5, linetype = "dashed") +
+  geom_line(aes(y = Prévisions), color = "red", size = 0.6) +
+  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "gray80", alpha = 0.5) +
+  annotate("rect",
+           xmin = df_plot$Date[length(train_data$indice) + 1],
+           xmax = max(df_plot$Date),
+           ymin = -Inf, ymax = Inf,
+           fill = "gray90", alpha = 0.4) +
+  labs(x = "Date", y = "Indice de production manufacturière",
+       title = "Prévisions  de l'indice et intervalles de confiance") +
+  theme_minimal(base_family = "serif") +
+  theme(
+    panel.grid.major = element_line(color = "gray90", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9),
+    legend.position = "none"
+  )
+
+# Combinaison côte à côte
+p2 + p1  # ou p1 + p2
