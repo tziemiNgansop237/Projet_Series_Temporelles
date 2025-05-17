@@ -214,7 +214,7 @@ train_copie["d_indice"]=c(NA,diff(train_data$indice,1)) # différenciation d'ord
 
 ## Représentation des autocorrélations simples des séries indice et d_indice
 
-
+window()
 par(mfrow=c(1,2))
 acf(train_data$indice,lag.max=24,main="",xaxt = "n")
 axis(1, at = 0:24, labels = FALSE)
@@ -259,15 +259,19 @@ grid.arrange(serie_brute, serie_diff, nrow = 1)
 # Pour le choix des ordres p et q, nous allons nous servir des fonctions d'autocorrélation (simples et partielles)
 
 windows()
-par(mfrow=c(1,2))
-acf(train_data$d_indice[-1],20,main="",xaxt = "n")
+par(mfrow = c(1, 2))
+
+# ACF
+acf(train_data$d_indice[-1], 20, main = "", xaxt = "n")
 axis(1, at = 0:20, labels = FALSE)
 text(x = 0:20, y = par("usr")[3] - 0.05, 
-     labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
-pacf(train_data$d_indice[-1],20,main="",xaxt = "n")#on regarde jusqu'à 20 mois de retard
+     labels = 0:20, srt = 90, adj = 1, xpd = TRUE, cex = 0.6)
+
+# PACF
+pacf(train_data$d_indice[-1], 20, main = "", xaxt = "n")
 axis(1, at = 1:20, labels = FALSE)
 text(x = 1:20, y = par("usr")[3] - 0.02, 
-     labels = 1:20, srt = 90, adj = 1, xpd = TRUE)
+     labels = 1:20, srt = 90, adj = 1, xpd = TRUE, cex = 0.6)
 
 pmax=2 ; qmax=2
 
@@ -302,7 +306,7 @@ modeles_valides
 
 
 # Les modèles ayant réussi à ces test sont les suivants:
-   #--------MA(0,2), ARMA(1,2), ARMA(2,1)-----------#
+   #--------MA(2), ARMA(1,2), ARMA(2,1)-----------#
 
 #==============================================================================#
 # p = 0, q = 2
@@ -355,7 +359,7 @@ cat("P-value : ", p_value, "\n")
 
 
 # ____________________________Modèle:ARMA(1,2)_________________________________#
-
+ar1ma2
 
 ##---------5. Exprimer le modèle ARIMA(p,d,q) pour la série choisie------------#
 
@@ -478,22 +482,100 @@ df_plot <- data.frame(
 
 
 
-# Tracer le graphique
+
+
 ggplot(df_plot, aes(x = Date)) +
-  geom_line(aes(y = Train, color = "Train")) +
-  geom_line(aes(y = Test, color = "Test")) +
-  geom_line(aes(y = Prévisions, color = "Prévisions")) +
-  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "pink", alpha = 0.3) +
+  geom_line(aes(y = Train), color = "black", size = 0.4) +
+  geom_line(aes(y = Test), color = "blue", size = 0.5, linetype = "dashed") +
+  geom_line(aes(y = Prévisions), color = "red", size = 0.6) +
+  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "gray80", alpha = 0.5) +
   annotate("rect",
            xmin = df_plot$Date[length(train_data$indice) + 1],
            xmax = max(df_plot$Date),
            ymin = -Inf, ymax = Inf,
-           fill = "lightgrey", alpha = 0.3) +
-  scale_color_manual(values = c("Train" = "cyan", "Test" = "blue", "Prévisions" = "deeppink")) +
-  labs(title = "Prévisions ARIMA vs Données réelles",
-       x = "Date", y = "Indice", color = "Légende") +
-  theme_minimal()
+           fill = "gray90", alpha = 0.4) +
+  labs(x = "Date", y = "Indice de production manufacturière") +
+  theme_minimal(base_family = "serif") +
+  theme(
+    panel.grid.major = element_line(color = "gray90", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9),
+    legend.position = "none"  # retirer la légende pour un style académique propre
+  )
 
 
+library(ellipse)
+pred <- forecast(arima112, h = 2, level = 95)
+
+# Suppose une corrélation rho entre les deux prévisions
+rho <- 0.8  # corrélation supposée
+sigma1 <- (pred$upper[1] - pred$lower[1]) / (2 * 1.96)
+sigma2 <- (pred$upper[2] - pred$lower[2]) / (2 * 1.96)
+
+# Calcul de la covariance à partir des écarts-types et de la corrélation
+cov_val <- rho * sigma1 * sigma2
+
+# Matrice de covariance avec corrélation
+Sigma <- matrix(c(sigma1^2, cov_val,
+                  cov_val, sigma2^2), nrow = 2)
+
+# Centre des prévisions
+mu <- c(as.numeric(pred$mean[1]), as.numeric(pred$mean[2]))
+
+
+ellipse_pts <- ellipse(Sigma, centre = mu, level = 0.95)
+ellipse_df <- as.data.frame(ellipse_pts)
+
+
+
+
+
+################################################
+# Charger les bibliothèques nécessaires
+library(ggplot2)
+library(patchwork)
+
+# Ton premier graphique : ellipse
+p1 <- ggplot(ellipse_df, aes(x = x, y = y)) +
+  geom_path(color = "black") +
+  geom_point(aes(x = mu[1], y = mu[2]), color = "black", size = 2) +
+  labs(x = "Prévision Mars 2022", y = "Prévision Avril 2022",
+       title = "Ellipse de confiance jointe ") +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9)
+  )
+
+
+
+# Ton deuxième graphique : série temporelle
+p2 <- ggplot(df_plot, aes(x = Date)) +
+  geom_line(aes(y = Train), color = "black", size = 0.4) +
+  geom_line(aes(y = Test), color = "blue", size = 0.5, linetype = "dashed") +
+  geom_line(aes(y = Prévisions), color = "red", size = 0.6) +
+  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "gray80", alpha = 0.5) +
+  annotate("rect",
+           xmin = df_plot$Date[length(train_data$indice) + 1],
+           xmax = max(df_plot$Date),
+           ymin = -Inf, ymax = Inf,
+           fill = "gray90", alpha = 0.4) +
+  labs(x = "Date", y = "Indice de production manufacturière",
+       title = "Prévisions  de l'indice et intervalles de confiance") +
+  theme_minimal(base_family = "serif") +
+  theme(
+    panel.grid.major = element_line(color = "gray90", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9),
+    legend.position = "none"
+  )
+
+# Combinaison côte à côte
+p2 + p1  # ou p1 + p2
 
 
