@@ -498,11 +498,11 @@ print(roots)
 #6. Ecrire l’équation vérifiée par la région de confiance de niveau α sur les
 #___valeurs futures (XT+1,XT+2).
 
-#**************************(voir document)*************************************#
+#**************************(voir Rapport)*************************************#
 
 #7. Préciser les hypothèses utilisées pour obtenir cette région.
 
-#**************************(voir document)*************************************#
+#**************************(voir Rapport)*************************************#
 
 # Convertir la série en data frame pour ggplot
 data_frame <- data.frame(valeurs = as.numeric(arima112$residuals))
@@ -545,34 +545,8 @@ df_plot <- data.frame(
   IC_up = c(rep(NA, length(train_data$indice)), as.numeric(pred$upper))
 )
 
-
-
-
 #==============================================================================#
-#___Graphique de la série temporelle avec prévisions et intervalles de confiance
-windows()
-ggplot(df_plot, aes(x = Date)) +
-  geom_line(aes(y = Train), color = "black", size = 0.4) +
-  geom_line(aes(y = Test), color = "blue", size = 0.5, linetype = "dashed") +
-  geom_line(aes(y = Prévisions), color = "red", size = 0.6) +
-  geom_ribbon(aes(ymin = IC_low, ymax = IC_up), fill = "gray80", alpha = 0.5) +
-  annotate("rect",
-           xmin = df_plot$Date[length(train_data$indice) + 1],
-           xmax = max(df_plot$Date),
-           ymin = -Inf, ymax = Inf,
-           fill = "gray90", alpha = 0.4) +
-  labs(x = "Date", y = "Indice de production manufacturière") +
-  theme_minimal(base_family = "serif") +
-  theme(
-    panel.grid.major = element_line(color = "gray90", size = 0.2),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
-    axis.title = element_text(size = 10),
-    axis.text = element_text(size = 9),
-    legend.position = "none"  #nous retirons la légende pour un style académique propre
-  )
 
-#==============================================================================#
 pred <- forecast(arima112, h = 2, level = 95)
 
 # Suppose une corrélation rho entre les deux prévisions
@@ -594,9 +568,13 @@ mu <- c(as.numeric(pred$mean[1]), as.numeric(pred$mean[2]))
 ellipse_pts <- ellipse(Sigma, centre = mu, level = 0.95)
 ellipse_df <- as.data.frame(ellipse_pts)
 
+#==============================================================================#
+#___Graphique de la série temporelle avec prévisions et intervalles de confiance
+
 
 ################################################
-# Ton premier graphique : ellipse
+#==============================================================================#
+#___Graphique de l'intervalle de confiance: ellipse
 p1 <- ggplot(ellipse_df, aes(x = x, y = y)) +
   geom_path(color = "black") +
   geom_point(aes(x = mu[1], y = mu[2]), color = "black", size = 2) +
@@ -607,9 +585,11 @@ p1 <- ggplot(ellipse_df, aes(x = x, y = y)) +
     plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
     axis.title = element_text(size = 10),
     axis.text = element_text(size = 9)
-  
+  )
 
-# Ton deuxième graphique : série temporelle
+#==============================================================================#
+#___Graphique de la série temporelle avec prévisions 
+
 p2 <- ggplot(df_plot, aes(x = Date)) +
   geom_line(aes(y = Train), color = "black", size = 0.4) +
   geom_line(aes(y = Test), color = "blue", size = 0.5, linetype = "dashed") +
@@ -632,5 +612,14 @@ p2 <- ggplot(df_plot, aes(x = Date)) +
     legend.position = "none"
   )
 
-# Combinaison côte à côte
-p2 + p1  # ou p1 + p2
+# affichage des deux graphiques dans une seule fenetre
+p2 + p1 
+
+#==============================================================================#
+#__9. conditions pour améliorer la prévision
+
+#**************************(voir Rapport)*************************************#
+
+#------------------------------------------------------------------------------#
+#==================================-FIN-=======================================#
+#------------------------------------------------------------------------------#
