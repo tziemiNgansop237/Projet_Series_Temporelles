@@ -88,7 +88,6 @@ test_data <- data %>%
 train_copie <- train_data
 #==============================================================================#
 
-
 # ========================================================================= #
 # =============================== Question 2 ============================== #
 # ========================================================================= #
@@ -117,7 +116,7 @@ ggplot(train_data, aes(x = Periode, y = indice)) +
   geom_line(color = "black") +  # Series color
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
   labs(x = "", y = "Index values", title = "") +
-  theme(panel.background = element_rect(fill = "lightgrey"))  # Grey background color
+  theme(panel.background = element_rect(fill = "lightgrey"))  
 
 #### Checking simple and partial autocorrelations of the raw series
 
@@ -130,20 +129,29 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 # perform an Augmented Dickey-Fuller stationarity test
 #==============================================================================#
 
+
+
 ##### 2-b) Stationarity test of the series
 
-## a- Augmented Dickey-Fuller Test
 
-#   ''' First, we automatically select the optimal number of lags 
-#       using the AIC criterion, then we check whether the residuals 
-#       of this model are independent. To strengthen robustness, 
-#       if the residuals show autocorrelation, we will readjust the model
-#       and increase the lags to k+1 '''
+# In this section, we will write a function `adftest_valid` that tests, 
+# for k from 1 to kmax, the stationarity of the AR using `adftest`, but 
+# retains only the one for which the residuals are weak white noise.
 
 
+### a- Function to check residual autocorrelation 
+Qtests <- function(var, k, fitdf = 0) {
+  pvals <- apply(matrix(1:k), 1, FUN = function(l) {
+    pval <- if (l <= fitdf) NA else Box.test(var, lag = l, type = "Ljung-Box", 
+    fitdf = fitdf)$p.value  # The Ljung-Box test checks the null hypothesis 
+                            #that autocorrelations up to lag are zero
+    return(c("lag" = l, "pval" = pval))
+  })
+  return(t(pvals))
+}
 
-###__________Optimal Lag method_________#
 
+### b - Augmented Dickey-Fuller Test
 # Function to find the optimal lag for the Dickey-Fuller regression
 adfTest_valid <- function(var, kmax, adftype){
   k <- 0
@@ -151,7 +159,8 @@ adfTest_valid <- function(var, kmax, adftype){
   while (noautocorr==0){
     cat(paste0("ADF with ",k," lags: residuals OK? "))
     test_adf <- adfTest(var, lags=k, type=adftype)
-    pvals <- Qtests(test_adf@test$lm$residuals, 20, fitdf = length(test_adf@test$lm$coefficients))[,2] # Perform portmanteau test
+    pvals <- Qtests(test_adf@test$lm$residuals, 20, fitdf = length(
+                   test_adf@test$lm$coefficients))[,2] # Perform portmanteau test
     if (sum(pvals<0.05,na.rm=T)==0) { # if no p_value falls in the rejection zone
       noautocorr <- 1; cat("OK \n")
     } else cat("nope \n")
@@ -164,14 +173,16 @@ adfTest_valid <- function(var, kmax, adftype){
 #==============================================================================#
 
 ## Applying the function to find the effective lag for the ADF test
-best_adf <- adfTest_valid(var=train_data$indice,kmax=24,adftype="ct") # ADF with 4 lags: residuals OK? OK
-
+best_adf <- adfTest_valid(var=train_data$indice,kmax=24,adftype="ct") 
 best_adf
+
+## --------------The number of lag selected is k=2----------------------------#
 
 
 ### 2-c) Eliminating non-stationarity
 
-# We will difference the original series with a lag of 1 and name the transformed series d_indice
+# We will difference the original series with a lag of 1 and name the transformed
+                                                                 #series d_indice
 
 train_data["d_indice"]=c(NA,diff(train_data$indice,1)) # First-order differencing
 train_copie["d_indice"]=c(NA,diff(train_data$indice,1)) # First-order differencing

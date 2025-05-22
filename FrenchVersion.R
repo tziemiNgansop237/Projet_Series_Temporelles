@@ -119,6 +119,8 @@ ggplot(train_data, aes(x = Periode, y = indice)) +
   labs(x = "", y = "Valeurs de l'indice", title = "") +
   theme(panel.background = element_rect(fill = "lightgrey"))  # Couleur de fond grise
 
+
+
 #### Verification des Autocorrélations simples et partielles de la série brute
 
 windows()
@@ -130,23 +132,31 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 # faire un test de stationarité de Dickey Fuller augmenté
 #==============================================================================#
 
+
+
 ##### 2-b) Test de stationnarité de la serie
 
-## a- Test de Dickey Fuller augmenté
-
-#   ''' Nous selectionons tout d'abord automatiquement le nombre de lags optimal 
-#       par le crictère AIC, ensuite nous verifions si les résidus de ce modèle 
-#       sont indépendants , afin de renforcer la robustesse, au cas contraire  
-#       les résidedus montre l'autocorellation et Nous allons réajuster le modèle
-#       et augmenter les lags à k+1'''
+#Dans cette partie nous allons  écrire une fonction adftest_valid qui doit tester 
+#  pour k allant à kmax la stationarité du AR a l'aide de adftest mais retient  
+# uniquement celui dont les residus sont un bruit blanc faible.
 
 
-###__________Méthode du Lag Optimal_________#
+### a- Fonction de verification de l'autocorellation des résidus 
+Qtests  <- function(var, k, fitdf=0) {
+  pvals <- apply(matrix(1:k), 1, FUN=function(l) {
+    pval <- if (l<=fitdf) NA else Box.test(var, lag=l, type="Ljung-Box", 
+    fitdf=fitdf)$p.value # Le test de Ljung-Box teste l'hypothèse nulle selon laquelle les retards jusqu'à lag inclusivement de l'autocorrélation sont nuls
+    return(c("lag"=l,"pval"=pval))
+  })
+  return(t(pvals))
+}
 
+
+## b - Test de Dickey Fuller augmenté
 # function qui cherche le lag idéal pour la régression de Dickey Fuller
 adfTest_valid <- function(var, kmax, adftype){
   k <- 0
-  noautocorr <- 0 # est-ce que les résidus sont un BB faible ?
+  noautocorr <- 0 # est-ce que les résidus sont un BB faible 
   while (noautocorr==0){
     cat(paste0("ADF with ",k," lags: residuals OK? "))
     test_adf <- adfTest(var, lags=k, type=adftype)
