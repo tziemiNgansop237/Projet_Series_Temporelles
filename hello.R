@@ -25,6 +25,29 @@ library(lubridate)
 library(urca)
 library(lubridate)
 
+# Charger les bibliothèques nécessaires
+library(readxl)    # pour lire les fichiers Excel
+library(readr)     # pour écrire et lire les fichiers CSV
+
+# Définir le chemin du fichier d'origine
+chemin_xls <- "C:/Users/damso/Desktop/p/IPI_202501.xls"
+
+# Lire le fichier Excel (on suppose qu'il y a une seule feuille ou que la bonne est la première)
+donnees <- read_excel(chemin_xls)
+
+# Définir le chemin de sortie pour le fichier CSV
+chemin_csv <- "C:/Users/damso/Desktop/p/IPI_202501.csv"
+
+# Sauvegarder les données en format CSV
+write_csv(donnees, chemin_csv)
+
+# Importer le fichier CSV
+ipi_data <- read_csv(chemin_csv)
+
+# Afficher un aperçu
+head(ipi_data)
+
+
 
 ###### I- Importation du dataset  
 base<-read_excel("IPI_202501.xls")

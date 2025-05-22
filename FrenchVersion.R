@@ -31,8 +31,8 @@ library(urca)
 
 # Chargement et nettoyage de la base 
 ### Spécification du répertoire de travail
-chemin <- "C:/Users/damso/Desktop/p/IPI_202501.xls"
-base <- read_excel(chemin)
+chemin <- "C:/Users/damso/Desktop/p/IPI_202501.csv"
+base <- read_csv(chemin)
 
 summary(base)
 #==============================================================================#

@@ -32,8 +32,8 @@ library(urca)
 # Loading and cleaning the dataset 
 ### Setting the working directory
 ###Replace this directory with your own
-chemin <- "C:/Users/damso/Desktop/p/IPI_202501.xls"
-base <- read_excel(chemin)
+chemin <- "C:/Users/damso/Desktop/p/IPI_202501.csv"
+base <- read_csv(chemin)
 
 summary(base)
 #==============================================================================#
