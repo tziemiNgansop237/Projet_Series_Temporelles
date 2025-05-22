@@ -1,9 +1,10 @@
+
 ###############################################################################
-#                                                                             #
+#         Fichier de test des fonctionnalités                                 #
 #                PROJET DE SERIE TEMPORELLES                                  #
-##  Auteurs : TZIEMI Raymond  & Ivana Kuete                                  
-##  Classe : 2A
-##  Date : Mai 2024                                                                            #
+##        Auteurs : TZIEMI Raymond  & Ivana Kuete                             #    
+##  Classe : 2A                                                               #
+##  Date : Mai 2024                                                           #
 ###############################################################################
 
 ## Spécification du répertoire de travail
@@ -398,7 +399,7 @@ axis(1, at = 0:20, labels = FALSE)
 text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
 
 
-##_______________Verifier l'inversibilité du ARIMA(1,1,2)______________________#
+##_______________Verifiecation de l'inversibilité du ARIMA(1,1,2)______________________#
 
 #==============================================================================#
 #  - Selection des coefs ma1 et ma2

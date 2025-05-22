@@ -142,62 +142,7 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 
 
 
-##____________First method________________#
-
-
-# Combined ADF function with residual check
-adfTest_valid_combined <- function(var, kmax, adftype) {
-  # Select lags via BIC
-  adf_test <- ur.df(var, type = adftype, selectlags = "BIC")  # Lag selection via AIC
-  k <- adf_test@lags  # Number of lags selected by AIC
-  print(paste("Number of lags selected by BIC: ", k))
-  adf_test_aic <- ur.df(var, type = adftype, selectlags = "BIC")
-  print(paste("Number of lags selected by AIC: ", adf_test_aic@lags))
-  
-  # Extract residuals from ADF model
-  residuals_adf <- adf_test@res
-  
-  # Test adjusted model residuals for autocorrelation
-  pvals <- Qtests(residuals_adf, 24, fitdf = length(adf_test@teststat))[, 2]
-  
-  if (sum(pvals < 0.05, na.rm = TRUE) == 0) {
-    # If residuals are independent (no autocorrelation)
-    print("Residuals are independent (no autocorrelation detected).")
-  } else {
-    # If residuals still show autocorrelation, adjust the model
-    print("Residuals show autocorrelation, adjusting the model...")
-
-    # Increase lags and readjust the model 
-    
-    pvals_new <- pvals
-    while (sum(pvals_new < 0.05, na.rm = TRUE) != 0){
-      k <- k + 1
-      print(paste("Trying with ", k, " lags."))
-    
-      adf_test_new <- ur.df(var, type = adftype, lags = k)
-      residuals_adf_new <- adf_test_new@res
-    
-      # Check adjusted model residuals
-      pvals_new <- Qtests(residuals_adf_new, 24, fitdf = length(adf_test_new@teststat))[, 2]
-    
-      if (sum(pvals_new < 0.05, na.rm = TRUE) == 0) {
-        print("Adjusted model: Residuals are now independent.")
-      }else {
-      print("Residuals still show autocorrelation even after adjustment.")
-      adf_test <- adf_test_new
-      }
-    }
-  }
-  
-  return(adf_test)  # Return the final ADF test
-}
-#==============================================================================#
-
-# Example of application on a data series
-adfTest_valid_combined(train_data$indice, kmax = 24, adftype = "drift")
-#==============================================================================#
-
-###__________Second method_________#
+###__________Optimal Lag method_________#
 
 # Function to find the optimal lag for the Dickey-Fuller regression
 adfTest_valid <- function(var, kmax, adftype){
