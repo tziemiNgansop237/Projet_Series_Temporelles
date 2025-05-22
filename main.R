@@ -15,13 +15,11 @@
 
 require(zoo) #convenient and easy-to-use time series format
 require(tseries)
-#install.packages("seastests")
-#install.packages("patchwork")
 
-library(seastests)
 library(patchwork)
+library(seastests)
 library(dplyr)
-library(readr)
+library(readxl)
 library(ellipse)
 require(zoo)
 library(ggplot2)
@@ -31,12 +29,14 @@ library(forecast)
 library(tseries)
 library(lubridate)
 library(urca)
+library(readr)
 
 # Loading and cleaning the dataset 
 ### Setting the working directory
 ###Replace this directory with your own
-chemin <- "C:/Users/damso/Desktop/p/IPI_202501.csv"
+chemin <- "C:/Users/LENOVO/Desktop/PROJET_serie_temp/IPI_202501.csv"
 base <- read_csv(chemin)
+
 
 summary(base)
 #==============================================================================#
@@ -89,29 +89,10 @@ test_data <- data %>%
 #    ''' Copy of the train_data '''
 
 train_copie <- train_data
-#==============================================================================#
-
-# ========================================================================= #
-# =============================== Question 2 ============================== #
-# ========================================================================= #
 
 
-#==============================================================================#
-### 2-a) Checking the seasonality of the time series
 
-## Since this is a monthly series, we will check for seasonality 
-## over 12 months (1 year) using the QS test (Q-statistic test)
-ts_data <- ts(data$indice, frequency = 12)  
-isSeasonal(ts_data, test = "qs")  # "qs" = test based on intra-period variance
-
-###########################################################
-# This test indicates that the series is not seasonal,
-# so we will focus on stationarity.
-#_____________________________#___________________________#
-
-
-#==============================================================================#
-### 2-a) Data visualization before processing
+#______________ Data visualization before processing___________________________#
 
 windows()
 
@@ -130,11 +111,33 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 
 # we suspect the presence of a deterministic trend, so we will 
 # perform an Augmented Dickey-Fuller stationarity test
-#==============================================================================#
+
+
+# ============================================================================ #
+   #============================== Question 2 ============================== #
+# ============================================================================ #
 
 
 
-##### 2-b) Stationarity test of the series
+#______________2-a) Checking the seasonality of the time series________________#
+
+## Since this is a monthly series, we will check for seasonality 
+## over 12 months (1 year) using the QS test (Q-statistic test)
+ts_data <- ts(data$indice, frequency = 12)  
+isSeasonal(ts_data, test = "qs")  # "qs" = test based on intra-period variance
+
+# Results:
+#      - This test indicates that the series is not seasonal,
+#      - so we will focus on stationarity.
+
+
+
+
+
+
+
+
+#_________________2-b) Stationarity test of the series_________________________#
 
 
 # In this section, we will write a function `adftest_valid` that tests, 
@@ -142,7 +145,7 @@ acf(train_data$indice,40,main="");pacf(train_data$indice,40,main="")
 # retains only the one for which the residuals are weak white noise.
 
 
-### a- Function to check residual autocorrelation 
+############### i- Function to check residual autocorrelation 
 Qtests <- function(var, k, fitdf = 0) {
   pvals <- apply(matrix(1:k), 1, FUN = function(l) {
     pval <- if (l <= fitdf) NA else Box.test(var, lag = l, type = "Ljung-Box", 
@@ -154,7 +157,8 @@ Qtests <- function(var, k, fitdf = 0) {
 }
 
 
-### b - Augmented Dickey-Fuller Test
+######  ii - Augmented Dickey-Fuller Test
+
 # Function to find the optimal lag for the Dickey-Fuller regression
 adfTest_valid <- function(var, kmax, adftype){
   k <- 0
@@ -173,59 +177,83 @@ adfTest_valid <- function(var, kmax, adftype){
   }
   return(test_adf)
 }
-#==============================================================================#
 
-## Applying the function to find the effective lag for the ADF test
+
+####  Applying the function to find the effective lag for the ADF test
 best_adf <- adfTest_valid(var=train_data$indice,kmax=24,adftype="ct") 
 best_adf
 
-## --------------The number of lag selected is k=2----------------------------#
+#Result:
+#       -The number of lag selected is k=2
+#       - the p values is equal to 0.3471 then we don't reject hypothesis of non 
+#                                                                   stationarity
 
 
-### 2-c) Eliminating non-stationarity
 
-# We will difference the original series with a lag of 1 and name the transformed
-                                                                 #series d_indice
 
+#_________________2-c) Eliminating non-stationarity____________________________#
+#Because de serie is a economis time serie,We will difference the original series 
+#                      with a lag of 1 and name the transformed series d_indice
+                                                                 
 train_data["d_indice"]=c(NA,diff(train_data$indice,1)) # First-order differencing
 train_copie["d_indice"]=c(NA,diff(train_data$indice,1)) # First-order differencing
 
 
 
-## Plotting simple autocorrelations of both original and differenced series
+#######Plotting simple autocorrelations of both original and differenced series
 
 windows()
 par(mfrow=c(1,2))
 acf(train_data$indice,lag.max=24,main="",xaxt = "n")
 axis(1, at = 0:24, labels = FALSE)
-text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, adj = 1, xpd = TRUE)
+text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, 
+                                                            adj = 1, xpd = TRUE)
 
 acf(train_data$d_indice[-1],lag.max=24,main="",xaxt = "n")
 axis(1, at = 0:24, labels = FALSE)
-text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90, adj = 1, xpd = TRUE)
+text(x = 0:24, y = par("usr")[3] - 0.05, labels = 0:24, srt = 90,
+                                                            adj = 1, xpd = TRUE)
+
+# Results:
+#        - The indice seem  non stationary
+#        - The d_indice seem stationary
 
 
-## 2-d) Stationarity test of the differenced series d_indice
 
-best_dadf <- adfTest_valid(var=train_data$d_indice,kmax=24,adftype="ct") # ADF with 3 lags: residuals OK? OK
 
+##_______2-d) Stationarity test of the differenced series d_indice_____________#
+
+
+#### augmented Dicker Fuller Test
+best_dadf <- adfTest_valid(var=train_data$d_indice,kmax=24,adftype="ct"                                          ) 
 best_dadf
 
-### We observe that the differenced series is stationary
+#Results: 
+#       - We observe that the differenced series is stationary
+#       - The p-values is 0.01 so we rejtect non stationary at the 5% level
+
+
 
 ## Using other tests to confirm previous results
 # KPSS test:
-kpss.test(train_data$d_indice[-1]) # stationarity
-pp.test(train_data$d_indice[-1])   # stationarity
+kpss.test(train_data$d_indice[-1]) 
+pp.test(train_data$d_indice[-1])
 
-# Stationarity is clearly confirmed
+#Results: 
+#       - KPSS p_values is 0.1 , so we don't reject stationarity at 5% level
+#       - PP.test pvalues is 0.01 so we rejtect non stationary at the 5% level
+#       - Stationarity is clearly confirmed
 
 
-# ========================================================================= #
-# =============================== Question 3 ============================== #
-# ========================================================================= #
 
-### Graphically represent the chosen series before and after transformation ----
+
+
+
+# ============================================================================ #
+  # =============================== Question 3 ============================= #
+# ========================================================================= ===#
+
+#___Graphically represent the chosen series before and after transformation____#
 
 windows()
 # Creating both plots
@@ -241,25 +269,42 @@ serie_diff <- ggplot(data = train_copie[-1,], aes(x = Periode, y = d_indice)) +
 
 # Displaying both plots side by side
 grid.arrange(serie_brute, serie_diff, nrow = 1)
-#==============================================================================#
 
-# **************************************************************************#
-#                                                                           #
-#                                                                           #
-#                         PART II: ARMA Models                              #
-#                                                                           #
-#                                                                           #
-# **************************************************************************#
 
-#==============================================================================#
 
-# ========================================================================= #
-# =============================== Question 4 ============================== #
-# ========================================================================= #
 
-### Choosing ARMA(p,q) model and checking its validity
 
-# To choose the p and q orders, we will use autocorrelation (ACF) and partial autocorrelation (PACF) functions
+
+
+
+
+
+
+
+
+# *****************************************************************************#
+#                                                                              #
+#                                                                              #
+#                         PART II: ARMA Models                                 #
+#                                                                              #
+#                                                                              #
+# *****************************************************************************#
+
+
+
+# =============================================================================#
+ # =============================== Question 4 ============================== #
+# =============================================================================#
+
+
+#_________1- Choosing ARMA(p,q) model and checking its validity________________#
+
+
+###      1.a  Choose pmax and qmax by ACF and PACF
+
+#   To choose the p and q orders, we will use autocorrelation (ACF) and partial 
+#       autocorrelation (PACF) functions
+
 
 windows()
 par(mfrow=c(1,2))
@@ -272,15 +317,21 @@ axis(1, at = 1:20, labels = FALSE)
 text(x = 1:20, y = par("usr")[3] - 0.02, 
      labels = 1:20, srt = 90, adj = 1, xpd = TRUE)
 
+# Results:
+#       - Max AR order seem p=2
+#       - Max MA order seem q=2
+
+
+
+
 pmax=2 ; qmax=2
 
 
-## Estimating all possible models
+#           1.b-Estimating all possible models
 
-# Initialize the list of valid models: those with white noise residuals and well-specified p and q orders
-
-# We explore all (p, q) pairs between 0 and pmax/qmax, then we test if the ARIMA(p, 0, q) model:
-  
+# -We explore all (p, q) pairs between 0 and pmax/qmax, then we test if the 
+#                                                         ARIMA(p, 0, q) model:
+ 
 # a. Can be estimated without error.
 
 # b. Produces residuals close to white noise.
@@ -288,6 +339,8 @@ pmax=2 ; qmax=2
 # c. Has significant coefficients.
 
 # d. Is reasonably parsimonious (pure AR or MA if possible).
+
+
 
 modeles_valides <- list()
 nb <-0
@@ -298,13 +351,15 @@ for (p in 0:pmax) {
     if ((sum(is.na(sqrt(diag(modele$var.coef))))==0) & (all(Qtests(
               modele$residuals, 24, fitdf = p+q)[,2] > 0.05, na.rm = TRUE)
                )) { # test for good residuals and well-estimated standard errors
-      validite <- abs(modele$coef/sqrt(diag(modele$var.coef)))>1.96 # model validity test (coefficient significance)
+      validite <- abs(modele$coef/sqrt(diag(modele$var.coef))
+                         )>1.96 # model validity test (coefficient significance)
       ajout <- FALSE
       if ((p==0 | q==0) & (validite[length(validite)])) {ajout <- TRUE}
       else if ((validite[p]) & (validite[p+q])) {ajout <- TRUE}
       if (ajout){
         nb <- nb + 1
-        modeles_valides <- append(modeles_valides, list(list(paste("model_", nb, sep = ""), p, q)))
+        modeles_valides <- append(modeles_valides, 
+                                list(list(paste("model_", nb, sep = ""), p, q)))
       }
     }
   }
@@ -315,8 +370,10 @@ modeles_valides
 
 
 
-# The models that passed these tests are:
-#--------MA(0,2), ARMA(1,2), ARMA(2,1)-----------#
+#__________The models that passed these tests are:_____________________________#
+
+                #--------MA(0,2), ARMA(1,2), ARMA(2,1)-----------#
+
 # We will project these models on the training data
 # to compare and then choose the best model according to 
 # AIC and BIC criteria.
@@ -332,7 +389,9 @@ ar1ma2 <- estim <- arima(train_data$d_indice,c(1,0,2))
 ar2ma1 <- estim <- arima(train_data$d_indice,c(2,0,1))
 #==============================================================================#
 
-# Choosing the best model among the 3 valid ones based on AIC and BIC criteria
+
+
+#1.c Choosing the best model among the 3 valid ones based on AIC and BIC criteria
 
 models <- list(ma2 = ma2, ar1ma2 = ar1ma2, ar2ma1 = ar2ma1)
 scores <- sapply(models, function(mod) {
@@ -416,14 +475,16 @@ acf(coredata(arima112$residuals),lag.max = 20,main="",xaxt = "n")
 axis(1, at = 0:20, labels = FALSE)
 # Add rotated labels at 90 degrees
 # Use text() function to add rotated labels
-text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, xpd = TRUE)
+text(x = 0:20, y = par("usr")[3] - 0.05, labels = 0:20, srt = 90, adj = 1, 
+         xpd = TRUE)
 
 
-##_______________Check invertibility of the ARIMA(1,1,2) model______________________#
+##______________Check invertibility of the ARIMA(1,1,2) model__________________#
 
 
 #==============================================================================#
-#  To do this, we check whether the roots of the ARMA(1,2) polynomial lie outside the unit circle
+#  To do this, we check whether the roots of the ARMA(1,2) polynomial lie 
+                                                        #outside the unit circle
 # - Start by extracting the ARIMA model coefficients
 # - Then select MA1 and MA2 coefficients
 #  - Then compute the polynomial roots
@@ -441,7 +502,7 @@ print(roots)
 #  - Their moduli are 1.409179 and 3.131788 respectively
 #  - All roots lie outside the unit circle
 
-#___Conclusion: The ARIMA(1,1,2) model is identifiable and correctly estimated____#
+#___Conclusion: The ARIMA(1,1,2) model is identifiable and correctly estimated_#
 #___It provides reliable predictions and is robust to past errors____#
 
 
@@ -491,7 +552,8 @@ IC_low <- c(rep(NA, length(train_data$indice)), pred$lower)
 
 
 #__Create a sequence of monthly dates
-date_index <- seq(as.Date("1990-01-01"), by = "month", length.out = length(train_data$d_indice) + 5)
+date_index <- seq(as.Date("1990-01-01"), by = "month", 
+                                   length.out = length(train_data$d_indice) + 5)
 
 #__Build a DataFrame for the plot
 df_plot <- data.frame(
