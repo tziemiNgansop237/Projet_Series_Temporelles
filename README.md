@@ -11,7 +11,7 @@ This project focuses on modeling and forecasting a time series representing the 
 ├── FrenchVersion.R    # Full French version of the main analysis
 ├── hello.R            # Scratchpad file used for intermediate testing and exploration
 ├── IPI_202501.csv     # Dataset: Monthly Industrial Production Index
-├── report.pdf         # Final report: contains written answers to specific questions
+├── report_time_series_TZIEMI_TANGOUO.pdf         # Final report: contains written answers to specific questions
 └── README.md          # Project documentation
 ```
 
