@@ -16,6 +16,7 @@
 require(zoo) #format de serie temporelle pratique et facile d'utilisation
 require(tseries)
 
+library(seastests)
 library(patchwork)
 library(dplyr)
 library(readxl)
