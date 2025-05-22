@@ -15,10 +15,13 @@
 
 require(zoo) #convenient and easy-to-use time series format
 require(tseries)
+#install.packages("seastests")
+#install.packages("patchwork")
 
+library(seastests)
 library(patchwork)
 library(dplyr)
-library(readxl)
+library(readr)
 library(ellipse)
 require(zoo)
 library(ggplot2)
